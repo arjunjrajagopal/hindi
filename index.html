@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B2A5E">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Akshar">
+<title>Akshar – trace the Hindi script</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  @font-face{font-family:"Poppins";font-weight:400;font-style:normal;font-display:swap;src:url("fonts/poppins-regular.woff") format("woff")}
+  @font-face{font-family:"Poppins";font-weight:500;font-style:normal;font-display:swap;src:url("fonts/poppins-medium.woff") format("woff")}
+  @font-face{font-family:"Poppins";font-weight:700;font-style:normal;font-display:swap;src:url("fonts/poppins-bold.woff") format("woff")}
+  @font-face{font-family:"Translit";font-weight:400;font-style:normal;font-display:swap;src:url("fonts/translit.woff") format("woff")}
+  :root{
+    --paper:#F2F3F6; --surface:#FFFFFF; --line:#DADDE4;
+    --text:#161B2E; --muted:#596079;
+    --guide:#D1D4DA;            /* the light grey letter you trace */
+    --rule:#C3C7D0;             /* the headline ruling */
+    --ink:#1B2A5E;              /* your pen */
+    --on-ink:#FFFFFF; --chip:#E6E9F4;
+    --gold:#B87A00; --gold-soft:#F7E6B8; --missed:rgba(214,150,10,.6);
+    --ui:"Poppins","Translit",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --script:"Poppins","Noto Sans Devanagari","Mukta","Translit",sans-serif;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#12141B; --surface:#1A1D26; --line:#2C303C;
+      --text:#ECEEF5; --muted:#9AA1B5;
+      --guide:#3C4151; --rule:#4A5062; --ink:#CBD6FF; --on-ink:#12141B; --chip:#2A3050;
+      --gold:#E8B54A; --gold-soft:#3B3017; --missed:rgba(232,181,74,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#12141B; --surface:#1A1D26; --line:#2C303C;
+    --text:#ECEEF5; --muted:#9AA1B5;
+    --guide:#3C4151; --rule:#4A5062; --ink:#CBD6FF; --on-ink:#12141B; --chip:#2A3050;
+    --gold:#E8B54A; --gold-soft:#3B3017; --missed:rgba(232,181,74,.6);
+  }
+  html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+  body{height:100%;margin:0;background:var(--paper);color:var(--text);font-family:var(--ui);overflow:hidden;
+       -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;overscroll-behavior:none;touch-action:manipulation}
+  [hidden]{display:none!important}
+  button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  .view{height:100%;display:flex;flex-direction:column}
+  .hi{font-family:var(--script)}
+
+  /* ---------- Home ---------- */
+  #home{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+  .home-inner{width:100%;max-width:1000px;box-sizing:border-box;padding:28px clamp(16px,4vw,48px) 56px}
+  .brand{font-family:var(--script);font-weight:700;font-size:clamp(44px,12vw,64px);line-height:1.25;margin:0}
+  .tagline{margin:4px 0 0;font-size:16px;color:var(--muted);max-width:34ch;line-height:1.5}
+  .go{display:flex;align-items:center;gap:10px 20px;flex-wrap:wrap;margin:24px 0 8px}
+  .primary{display:inline-flex;align-items:center;gap:12px;min-height:52px;padding:0 26px;border:0;border-radius:14px;
+           background:var(--ink);color:var(--on-ink);font-weight:500;font-size:16px}
+  .primary .tm{font-family:var(--script);font-size:24px;font-weight:500;line-height:1}
+  .count{font-size:15px;color:var(--muted)}
+  .strip{display:grid;grid-template-columns:repeat(var(--n,53),1fr);gap:2px;margin:14px 0 0;max-width:620px}
+  .strip i{height:6px;border-radius:3px;background:var(--line)}
+  .strip i.on{background:var(--gold)}
+  .status{margin:10px 0 0;font-size:13px;color:var(--muted);min-height:18px}
+  .group{margin-top:36px}
+  .group h2{margin:0 0 14px;font-size:19px;font-weight:500;display:flex;align-items:baseline;gap:12px}
+  .group h2 .tm{font-family:var(--script);font-size:17px;font-weight:400;color:var(--muted)}
+  .rows{display:grid;gap:8px}
+  .grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(76px,1fr))}
+  .grid.c5{grid-template-columns:repeat(5,minmax(0,112px))}
+  .tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+        min-height:88px;padding:8px 2px 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .tile .g{font-family:var(--script);font-size:36px;line-height:1.35;font-weight:500}
+  .tile .r{font-size:12px;color:var(--muted);margin-top:-2px}
+  .tile.done::after{content:"";position:absolute;left:24%;right:24%;bottom:8px;height:3px;border-radius:2px;background:var(--gold)}
+  .foot{margin-top:44px;display:flex;gap:10px;flex-wrap:wrap}
+  .quiet{min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-size:14px;font-weight:500}
+
+  /* ---------- Practice ---------- */
+  .bar{display:flex;align-items:center;gap:4px;min-height:60px;padding:6px clamp(6px,2vw,24px);
+       background:var(--surface);border-bottom:1px solid var(--line)}
+  .iconbtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:46px;min-height:46px;padding:0 10px;border:0;
+           background:transparent;border-radius:12px;font-size:15px;font-weight:500}
+  .iconbtn svg{width:24px;height:24px;flex:none}
+  .iconbtn:disabled{opacity:.3;cursor:default}
+  .current{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;min-width:0}
+  .ref{font-family:var(--script);font-size:40px;font-weight:500;line-height:1.3;position:relative}
+  .ref.done::after{content:"";position:absolute;left:12%;right:12%;bottom:2px;height:3px;border-radius:2px;background:var(--gold)}
+  .who{min-width:0}
+  .roman{font-size:19px;font-weight:700;line-height:1.2}
+  .meta{font-size:12.5px;color:var(--muted);line-height:1.3;max-width:26ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pos{min-width:52px;text-align:right;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;padding-right:6px}
+
+  #stage{position:relative;flex:1;min-height:0;background:var(--surface);overflow:hidden;touch-action:none}
+  #stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #ink{touch-action:none;cursor:crosshair}
+  #toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);max-width:86%;padding:10px 16px;border-radius:12px;
+         background:var(--ink);color:var(--on-ink);font-size:14px;font-weight:500;text-align:center;pointer-events:none;
+         opacity:0;transition:opacity .2s}
+  #toast.show{opacity:1}
+  #readout{margin:0;padding:8px clamp(12px,2vw,24px);min-height:58px;box-sizing:border-box;background:var(--surface);border-top:1px solid var(--line);
+           font-size:14px;line-height:1.45;color:var(--muted)}
+  #readout b{color:var(--text);font-weight:500}
+  #readout .ok{color:var(--gold);font-weight:700}
+
+  .tools{display:flex;align-items:center;gap:4px;padding:6px clamp(6px,2vw,20px);background:var(--surface);border-top:1px solid var(--line)}
+  .tools .sp{flex:1}
+  .tb{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-width:54px;min-height:54px;padding:4px 8px;
+      border:0;border-radius:12px;background:transparent;font-size:11.5px;font-weight:500}
+  .tb svg{width:24px;height:24px}
+  .tb[aria-pressed="true"]{background:var(--chip)}
+  .tb:disabled{opacity:.35;cursor:default}
+  .tb.emph{box-shadow:inset 0 0 0 2px var(--gold)}
+  .check{min-height:54px;padding:0 26px}
+
+  dialog{width:min(92vw,520px);border:1px solid var(--line);border-radius:16px;padding:20px;background:var(--surface);color:var(--text)}
+  dialog::backdrop{background:rgba(10,12,20,.5)}
+  dialog h3{margin:0 0 6px;font-size:18px;font-weight:500}
+  dialog p{margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--muted)}
+  dialog textarea{width:100%;box-sizing:border-box;height:120px;padding:10px;border:1px solid var(--line);border-radius:10px;
+                  background:var(--paper);color:var(--text);font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;
+                  -webkit-user-select:text;user-select:text;resize:none}
+  dialog .row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  dialog .msg{min-height:20px;margin-top:8px;font-size:13px;color:var(--muted)}
+
+  @media (max-width:520px){
+    .back .lbl{display:none}
+    .meta{max-width:16ch}
+    .pos{display:none}
+    .tb{min-width:48px}
+  }
+  @media (max-height:520px) and (orientation:landscape){
+    .bar{min-height:46px;padding-top:2px;padding-bottom:2px}
+    .ref{font-size:30px}.meta{display:none}.roman{font-size:17px}
+    .iconbtn{min-height:40px}
+    #readout{min-height:28px;padding:4px 14px;font-size:13px}
+    .tools{padding:2px 8px}
+    .tb{min-height:44px;min-width:46px;font-size:0;gap:0}
+    .check{min-height:44px;font-size:15px}
+    #toast{top:8px}
+  }
+  @media (prefers-reduced-motion: reduce){ #toast{transition:none} }
+</style>
+</head>
+<body>
+
+<!-- ================= HOME ================= -->
+<section id="home" class="view" aria-label="All letters">
+  <div class="home-inner">
+    <h1 class="brand" lang="hi">अक्षर</h1>
+    <p class="tagline">Trace the Hindi script, one letter at a time.</p>
+    <div class="go">
+      <button class="primary" id="continue" type="button"></button>
+      <button class="quiet" id="install" type="button" hidden>Install app</button>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="strip" id="strip" aria-hidden="true"></div>
+    <p class="status" id="status" role="status"></p>
+    <div id="groups"></div>
+    <div class="foot">
+      <button class="quiet" id="backupBtn" type="button">Back up or restore progress</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PRACTICE ================= -->
+<section id="practice" class="view" aria-label="Trace a letter" hidden>
+  <header class="bar">
+    <button class="iconbtn back" id="back" type="button" aria-label="Back to all letters">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <span class="lbl">Letters</span>
+    </button>
+    <button class="iconbtn" id="prev" type="button" aria-label="Previous letter">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="current">
+      <span class="ref" id="ref" lang="hi">अ</span>
+      <div class="who">
+        <div class="roman" id="roman">a</div>
+        <div class="meta" id="meta">Vowels</div>
+      </div>
+    </div>
+    <button class="iconbtn" id="next" type="button" aria-label="Next letter">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+    <div class="pos" id="pos">1 / 53</div>
+  </header>
+
+  <div id="stage">
+    <canvas id="guide" aria-hidden="true"></canvas>
+    <canvas id="ink" aria-label="Writing area. Trace the grey letter with your finger or stylus."></canvas>
+    <div id="toast" role="status"></div>
+  </div>
+
+  <p id="readout" role="status" aria-live="polite"></p>
+
+  <footer class="tools">
+    <button class="tb" id="undo" type="button" aria-label="Undo last stroke">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>Undo
+    </button>
+    <button class="tb" id="clear" type="button" aria-label="Clear writing">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>Clear
+    </button>
+    <button class="tb" id="guideBtn" type="button" aria-pressed="true" aria-label="Show or hide the grey guide letter">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Guide
+    </button>
+    <button class="tb" id="fingerBtn" type="button" aria-pressed="true" aria-label="Allow drawing with a finger" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V5a1.5 1.5 0 013 0v5"/><path d="M12 10V8a1.5 1.5 0 013 0v3"/><path d="M15 11a1.5 1.5 0 013 0v4a7 7 0 01-7 7h-1a6 6 0 01-5-3l-2-3a1.5 1.5 0 012.4-1.8L9 15"/></svg>Finger
+    </button>
+    <button class="tb" id="hearBtn" type="button" aria-label="Hear the letter" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7"/></svg>Hear
+    </button>
+    <span class="sp"></span>
+    <button class="primary check" id="check" type="button">Check</button>
+  </footer>
+</section>
+
+<dialog id="backup" aria-labelledby="bkTitle">
+  <h3 id="bkTitle">Back up or restore progress</h3>
+  <p>Your progress lives in this browser. To move it to another phone, or to keep a copy, copy the text below. To restore, paste a saved copy here and press Restore.</p>
+  <textarea id="bkText" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Progress backup text"></textarea>
+  <div class="row">
+    <button class="quiet" id="bkCopy" type="button">Copy</button>
+    <button class="quiet" id="bkRestore" type="button">Restore</button>
+    <button class="quiet" id="bkClose" type="button">Close</button>
+  </div>
+  <div class="msg" id="bkMsg" role="status"></div>
+</dialog>
+
+<script>
+window.__MODE='app';
+(() => {
+  /* ---------------- Script pack: everything specific to Hindi ---------------- */
+  const NK = '\u093C';   // nukta
+  const PACK = {
+    id: 'hi',
+    storageKey: 'akshar.v1',
+    scriptFont: '"Poppins","Noto Sans Devanagari","Mukta",sans-serif',
+    voiceLang: /^hi\b|^hi[-_]/i,
+    align: 'baseline',        // letters hang from a headline, so they share one baseline
+    refGlyph: 'क',            // used to place that baseline
+    headThick: 0.088,         // headline thickness, in em (measured from the font)
+    groups: [
+      { key:'Vowels', tm:'स्वर', cols:0, rows:[[
+        ['अ','a','as in “about”'],['आ','ā','long a, as in “father”'],['इ','i','short i, as in “bit”'],['ई','ī','long i, as in “feet”'],
+        ['उ','u','short u, as in “put”'],['ऊ','ū','long u, as in “boot”'],['ऋ','ṛ','“ri”, mostly in Sanskrit words'],
+        ['ए','e','as in “they”'],['ऐ','ai','between “cat” and “air”'],['ओ','o','as in “go”'],['औ','au','as in “caught”'],
+        ['अं','aṃ','a with a nasal sound'],['अः','aḥ','a with a breathy “h”'] ]] },
+      { key:'Consonants', tm:'व्यंजन', cols:5, rows:[
+        [['क','ka','unaspirated “k”'],['ख','kha','“k” with a puff of breath'],['ग','ga','“g”'],['घ','gha','“g” with a puff of breath'],['ङ','ṅa','“ng”, as in “sing”']],
+        [['च','ca','“ch”'],['छ','cha','“ch” with a puff of breath'],['ज','ja','“j”'],['झ','jha','“j” with a puff of breath'],['ञ','ña','“ny”, as in “canyon”']],
+        [['ट','ṭa','retroflex “t”'],['ठ','ṭha','retroflex “t”, aspirated'],['ड','ḍa','retroflex “d”'],['ढ','ḍha','retroflex “d”, aspirated'],['ण','ṇa','retroflex “n”']],
+        [['त','ta','dental “t”'],['थ','tha','dental “t”, aspirated'],['द','da','dental “d”'],['ध','dha','dental “d”, aspirated'],['न','na','dental “n”']],
+        [['प','pa','“p”'],['फ','pha','“p” with a puff of breath'],['ब','ba','“b”'],['भ','bha','“b” with a puff of breath'],['म','ma','“m”']],
+        [['य','ya','“y”'],['र','ra','tapped “r”'],['ल','la','“l”'],['व','va','between “v” and “w”']],
+        [['श','śa','“sh”'],['ष','ṣa','retroflex “sh”'],['स','sa','“s”'],['ह','ha','“h”']] ] },
+      { key:'Nukta letters', tm:'नुक़्ता', cols:0, rows:[[
+        ['क'+NK,'qa','“q”, from the back of the throat'],['ख'+NK,'xa','like “ch” in Scottish “loch”'],['ग'+NK,'ġa','a gargled “g”'],
+        ['ज'+NK,'za','“z”'],['ड'+NK,'ṛa','flapped “r”'],['ढ'+NK,'ṛha','flapped “r”, aspirated'],['फ'+NK,'fa','“f”'] ]] }
+    ]
+  };
+  const LETTERS = [];
+  PACK.groups.forEach(g => g.rows.forEach(row => row.forEach(([ch, roman, hint]) => LETTERS.push({ ch, roman, hint, group:g.key }))));
+  const N = LETTERS.length;
+
+  /* ---------------- Progress (per-device) ---------------- */
+  let prog = { done:{} }, storageOK = true;
+  try {
+    const s = localStorage.getItem(PACK.storageKey);
+    if (s) prog = Object.assign(prog, JSON.parse(s));
+    localStorage.setItem(PACK.storageKey + '.probe', '1'); localStorage.removeItem(PACK.storageKey + '.probe');
+  } catch(e) { storageOK = false; }
+  const save = () => { try { localStorage.setItem(PACK.storageKey, JSON.stringify(prog)); } catch(e){ storageOK = false; } };
+  const isDone = i => !!prog.done[LETTERS[i].ch];
+  const doneCount = () => LETTERS.filter((_, i) => isDone(i)).length;
+
+  /* ---------------- Elements ---------------- */
+  const $ = id => document.getElementById(id);
+  const home = $('home'), practice = $('practice'), stage = $('stage');
+  const guide = $('guide'), ink = $('ink');
+  const gctx = guide.getContext('2d'), ictx = ink.getContext('2d');
+  const readout = $('readout'), toastEl = $('toast');
+
+  /* ---------------- Drawing state ---------------- */
+  const FS = 0.56;          // glyph size, in units of S (the shorter side of the writing area)
+  const BR = 0.024;         // base pen width, in units of S
+  const PASS_COVER = 0.75, PASS_STRAY = 0.25;
+
+  let idx = 0, strokes = [], current = null;
+  let guideOn = true, fingerOn = true, penDown = false, penUpAt = 0;
+  let missed = null, passed = false;
+  let W = 0, H = 0, S = 0, cx = 0, cy = 0, dpr = 1;
+  let lastHint = 0;
+
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const wd = (p, s) => BR * s * (0.5 + 1.1 * p);
+
+  /* ---------------- Glyph + stroke helpers ---------------- */
+  // Returns where to draw `ch` so it is centred across and sits on the shared baseline.
+  function place(ctx, ch, fs, x0, y0) {
+    ctx.font = `500 ${fs}px ${PACK.scriptFont}`;
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    const m = ctx.measureText(ch), r = ctx.measureText(PACK.refGlyph);
+    return {
+      x: x0 - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2,
+      y: y0 - (r.actualBoundingBoxDescent - r.actualBoundingBoxAscent) / 2,
+      head: null,
+      refTop: r.actualBoundingBoxAscent
+    };
+  }
+  function drawGlyph(ctx, ch, fs, x0, y0, tolerance) {
+    const p = place(ctx, ch, fs, x0, y0);
+    ctx.fillText(ch, p.x, p.y);
+    if (tolerance) { ctx.lineWidth = tolerance; ctx.lineJoin = 'round'; ctx.strokeText(ch, p.x, p.y); }
+  }
+  function drawHeadline() {
+    const p = place(gctx, PACK.refGlyph, FS * S, cx, cy);
+    const y = p.y - p.refTop + (PACK.headThick * FS * S) / 2;
+    gctx.strokeStyle = css('--rule'); gctx.lineWidth = Math.max(1.5, S * 0.004);
+    gctx.setLineDash([S * 0.012, S * 0.012]);
+    gctx.beginPath(); gctx.moveTo(W * 0.04, y); gctx.lineTo(W * 0.96, y); gctx.stroke();
+    gctx.setLineDash([]);
+  }
+
+  // Strokes are stored relative to the canvas centre in units of S, so they stay
+  // aligned with the guide letter if the phone is rotated.
+  function drawStroke(ctx, st, ox, oy, s, fixed, from) {
+    const pts = st.pts;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (pts.length === 1) {
+      const q = pts[0];
+      ctx.beginPath();
+      ctx.arc(ox + q.u * s, oy + q.v * s, (fixed || wd(q.p, s)) / 2, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    for (let i = Math.max(1, from || 0); i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      ctx.lineWidth = fixed || wd((a.p + b.p) / 2, s);
+      ctx.beginPath();
+      ctx.moveTo(ox + a.u * s, oy + a.v * s);
+      ctx.lineTo(ox + b.u * s, oy + b.v * s);
+      ctx.stroke();
+    }
+  }
+
+  function redrawGuide() {
+    if (!W) return;
+    gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    gctx.clearRect(0, 0, W, H);
+    drawHeadline();
+    if (guideOn) {
+      gctx.fillStyle = css('--guide');
+      drawGlyph(gctx, LETTERS[idx].ch, FS * S, cx, cy, 0);
+    }
+    if (missed) {
+      gctx.imageSmoothingEnabled = true;
+      gctx.drawImage(missed, cx - 0.75 * S, cy - 0.75 * S, 1.5 * S, 1.5 * S);
+    }
+  }
+
+  function redrawInk() {
+    if (!W) return;
+    ictx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ictx.clearRect(0, 0, W, H);
+    const c = css('--ink');
+    ictx.fillStyle = c; ictx.strokeStyle = c;
+    strokes.forEach(st => drawStroke(ictx, st, cx, cy, S, 0, 0));
+  }
+
+  function layout() {
+    const r = stage.getBoundingClientRect();
+    if (!r.width || !r.height) { W = 0; return; }
+    W = r.width; H = r.height; S = Math.min(W, H); cx = W / 2; cy = H / 2;
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    [guide, ink].forEach(c => { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); });
+    redrawGuide(); redrawInk();
+  }
+
+  /* ---------------- Scoring ---------------- */
+  function score() {
+    const D = 360, R = 240;      // scoring canvas: 360px square covering 1.5 S, 240px per S
+    const mk = () => { const c = document.createElement('canvas'); c.width = c.height = D; return c; };
+    const ch = LETTERS[idx].ch;
+
+    const gC = mk(), g = gC.getContext('2d', { willReadFrequently:true });
+    g.fillStyle = '#000'; drawGlyph(g, ch, FS * R, D / 2, D / 2, 0);
+
+    const tC = mk(), t = tC.getContext('2d', { willReadFrequently:true });
+    t.fillStyle = '#000'; t.strokeStyle = '#000'; drawGlyph(t, ch, FS * R, D / 2, D / 2, 0.07 * R);
+
+    const thinC = mk(), th = thinC.getContext('2d', { willReadFrequently:true });
+    th.fillStyle = '#000'; th.strokeStyle = '#000';
+    strokes.forEach(st => drawStroke(th, st, D / 2, D / 2, R, 0, 0));
+
+    const fatC = mk(), ft = fatC.getContext('2d', { willReadFrequently:true });
+    ft.fillStyle = '#000'; ft.strokeStyle = '#000';
+    strokes.forEach(st => drawStroke(ft, st, D / 2, D / 2, R, 0.065 * R, 0));
+
+    const G = g.getImageData(0, 0, D, D).data, T = t.getImageData(0, 0, D, D).data;
+    const I = th.getImageData(0, 0, D, D).data, F = ft.getImageData(0, 0, D, D).data;
+
+    const mC = mk(), m = mC.getContext('2d');
+    const out = m.createImageData(D, D);
+    const gold = css('--missed').match(/[\d.]+/g).map(Number);
+    let gN = 0, gHit = 0, iN = 0, iOff = 0;
+    for (let p = 3; p < G.length; p += 4) {
+      const inG = G[p] > 110, inFat = F[p] > 110;
+      if (inG) { gN++; if (inFat) gHit++; else { out.data[p-3] = gold[0]; out.data[p-2] = gold[1]; out.data[p-1] = gold[2]; out.data[p] = 255 * (gold[3] ?? 1); } }
+      if (I[p] > 110) { iN++; if (T[p] <= 110) iOff++; }
+    }
+    m.putImageData(out, 0, 0);
+    const cover = gN ? gHit / gN : 0;
+    const stray = iN ? iOff / iN : 1;
+    return { cover, stray, missedCanvas:mC, pass: cover >= PASS_COVER && stray <= PASS_STRAY };
+  }
+
+  /* ---------------- UI helpers ---------------- */
+  function toast(msg) {
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    clearTimeout(toast.t); toast.t = setTimeout(() => toastEl.classList.remove('show'), 2800);
+  }
+
+  function defaultReadout() {
+    const l = LETTERS[idx];
+    readout.innerHTML = guideOn
+      ? `Trace over the grey letter. Lift between strokes, then press <b>Check</b>.`
+      : `Guide hidden. Write <b>${l.roman}</b> from memory, then press <b>Check</b>.`;
+  }
+
+  function updateButtons() {
+    $('undo').disabled = strokes.length === 0;
+    $('clear').disabled = strokes.length === 0 && !missed;
+    $('prev').disabled = idx === 0;
+    $('next').disabled = idx === N - 1;
+    $('next').classList.toggle('emph', passed && idx < N - 1);
+    $('ref').classList.toggle('done', isDone(idx));
+    $('guideBtn').setAttribute('aria-pressed', String(guideOn));
+    $('fingerBtn').setAttribute('aria-pressed', String(fingerOn));
+  }
+
+  function showLetter(i) {
+    idx = Math.max(0, Math.min(N - 1, i));
+    const l = LETTERS[idx];
+    strokes = []; current = null; missed = null; passed = false;
+    $('ref').textContent = l.ch;
+    $('roman').textContent = l.roman;
+    $('meta').textContent = l.hint || l.group;
+    $('meta').title = l.hint ? `${l.group} · ${l.hint}` : l.group;
+    $('pos').textContent = `${idx + 1} / ${N}`;
+    defaultReadout(); updateButtons(); redrawGuide(); redrawInk();
+  }
+
+  function openLetter(i) {
+    home.hidden = true; practice.hidden = false;
+    requestAnimationFrame(() => { layout(); showLetter(i); });
+  }
+  function goHome() { practice.hidden = true; home.hidden = false; renderHome(); }
+
+  /* ---------------- Pointer input (finger or stylus) ---------------- */
+  function allowed(e) {
+    if (e.pointerType === 'pen') return true;
+    if (e.pointerType === 'mouse') return e.button === 0;
+    // touch: ignore palms while a stylus is down (or has only just lifted)
+    if (penDown || Date.now() - penUpAt < 350) return false;
+    if (fingerOn) return true;
+    if (Date.now() - lastHint > 6000) { lastHint = Date.now(); toast('Finger drawing is off. Use your stylus, or tap Finger.'); }
+    return false;
+  }
+
+  function point(e, prevP) {
+    const r = ink.getBoundingClientRect();
+    let p = e.pressure;
+    if (e.pointerType !== 'pen' || !p) p = 0.5;
+    if (prevP != null) p = prevP + (p - prevP) * 0.45;
+    return { u:(e.clientX - r.left - cx) / S, v:(e.clientY - r.top - cy) / S, p };
+  }
+
+  ink.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'pen') {
+      penDown = true;
+      if ($('fingerBtn').hidden) {        // first time a stylus is seen: switch to stylus-only
+        $('fingerBtn').hidden = false; fingerOn = false; updateButtons();
+        toast('Stylus detected. Finger drawing is now off; tap Finger to allow it.');
+      }
+    }
+    if (!allowed(e)) return;
+    e.preventDefault();
+    try { ink.setPointerCapture(e.pointerId); } catch(_) {}
+    if (missed || passed) { missed = null; passed = false; redrawGuide(); defaultReadout(); }
+    current = { id:e.pointerId, pts:[point(e)] };
+    const c = css('--ink'); ictx.fillStyle = c; ictx.strokeStyle = c;
+    drawStroke(ictx, current, cx, cy, S, 0, 0);
+  });
+
+  ink.addEventListener('pointermove', e => {
+    if (!current || e.pointerId !== current.id) return;
+    e.preventDefault();
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    const from = current.pts.length;
+    (evs.length ? evs : [e]).forEach(ev => {
+      const last = current.pts[current.pts.length - 1];
+      current.pts.push(point(ev, last.p));
+    });
+    drawStroke(ictx, current, cx, cy, S, 0, from);
+  });
+
+  function endStroke(e) {
+    if (e.pointerType === 'pen') { penDown = false; penUpAt = Date.now(); }
+    if (!current || e.pointerId !== current.id) return;
+    strokes.push(current); current = null;
+    updateButtons();
+  }
+  ink.addEventListener('pointerup', endStroke);
+  ink.addEventListener('pointercancel', endStroke);
+  ink.addEventListener('contextmenu', e => e.preventDefault());
+
+  /* ---------------- Controls ---------------- */
+  $('back').addEventListener('click', goHome);
+  $('prev').addEventListener('click', () => showLetter(idx - 1));
+  $('next').addEventListener('click', () => showLetter(idx + 1));
+
+  $('undo').addEventListener('click', () => {
+    if (!strokes.length) return;
+    strokes.pop(); missed = null; passed = false;
+    redrawGuide(); redrawInk(); defaultReadout(); updateButtons();
+  });
+  $('clear').addEventListener('click', () => {
+    strokes = []; missed = null; passed = false;
+    redrawGuide(); redrawInk(); defaultReadout(); updateButtons();
+  });
+  $('guideBtn').addEventListener('click', () => {
+    guideOn = !guideOn; redrawGuide(); updateButtons();
+    if (!strokes.length) defaultReadout();
+  });
+  $('fingerBtn').addEventListener('click', () => {
+    fingerOn = !fingerOn; updateButtons();
+    toast(fingerOn ? 'Finger drawing on. Palm is ignored while the stylus is down.' : 'Finger drawing off. Stylus only.');
+  });
+
+  $('check').addEventListener('click', () => {
+    if (!strokes.length) { readout.innerHTML = `Nothing to check yet. Trace the letter first.`; return; }
+    const r = score();
+    const cov = Math.round(r.cover * 100), off = Math.round(r.stray * 100);
+    const nums = `<b>${cov}%</b> covered, <b>${off}%</b> off the line.`;
+    if (r.pass) {
+      passed = true; missed = null;
+      prog.done[LETTERS[idx].ch] = true; save();
+      readout.innerHTML = `<span class="ok">Well traced.</span> ${nums} Marked as done.`;
+    } else {
+      passed = false; missed = r.missedCanvas;
+      readout.innerHTML = r.cover < PASS_COVER
+        ? `Part of the letter is missing (gold). ${nums}`
+        : `Close, but some ink strayed. ${nums}`;
+    }
+    redrawGuide(); updateButtons();
+  });
+
+  /* Hear the letter, if this device has a Hindi voice */
+  const hear = $('hearBtn');
+  const findVoice = () => ('speechSynthesis' in window) ? (speechSynthesis.getVoices().find(v => PACK.voiceLang.test(v.lang)) || null) : null;
+  const refreshVoice = () => { hear.hidden = !findVoice(); };
+  if ('speechSynthesis' in window) {
+    refreshVoice();
+    speechSynthesis.addEventListener && speechSynthesis.addEventListener('voiceschanged', refreshVoice);
+  }
+  hear.addEventListener('click', () => {
+    const v = findVoice(); if (!v) return;
+    const u = new SpeechSynthesisUtterance(LETTERS[idx].ch);
+    u.voice = v; u.lang = v.lang; u.rate = 0.7;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  });
+
+  window.addEventListener('keydown', e => {
+    if (practice.hidden || $('backup').open) return;
+    if (e.key === 'ArrowRight') showLetter(idx + 1);
+    else if (e.key === 'ArrowLeft') showLetter(idx - 1);
+    else if (e.key === 'Enter') $('check').click();
+    else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); $('undo').click(); }
+  });
+
+  /* ---------------- Back up / restore ---------------- */
+  const dlg = $('backup'), bkText = $('bkText'), bkMsg = $('bkMsg');
+  const exportText = () => JSON.stringify({ app:'akshar', v:1, done: LETTERS.filter((_, i) => isDone(i)).map(l => l.ch) });
+  $('backupBtn').addEventListener('click', () => {
+    bkText.value = exportText(); bkMsg.textContent = '';
+    dlg.showModal ? dlg.showModal() : dlg.setAttribute('open', '');
+  });
+  $('bkClose').addEventListener('click', () => dlg.close ? dlg.close() : dlg.removeAttribute('open'));
+  $('bkCopy').addEventListener('click', async () => {
+    bkText.value = exportText(); bkText.select();
+    try { await navigator.clipboard.writeText(bkText.value); bkMsg.textContent = 'Copied.'; }
+    catch(_) { try { document.execCommand('copy'); bkMsg.textContent = 'Copied.'; } catch(__) { bkMsg.textContent = 'Select the text and copy it.'; } }
+  });
+  $('bkRestore').addEventListener('click', () => {
+    try {
+      const o = JSON.parse(bkText.value.trim());
+      if (o.app !== 'akshar' || !Array.isArray(o.done)) throw 0;
+      const valid = new Set(LETTERS.map(l => l.ch));
+      const done = {}; o.done.forEach(c => { if (valid.has(c)) done[c] = true; });
+      prog.done = done; save(); renderHome();
+      bkMsg.textContent = `Restored ${Object.keys(done).length} letters.`;
+    } catch(_) { bkMsg.textContent = 'That text is not a saved copy from this app.'; }
+  });
+
+  /* ---------------- Home screen ---------------- */
+  function renderHome() {
+    const groupsEl = $('groups'); groupsEl.innerHTML = '';
+    let n = 0;
+    PACK.groups.forEach(g => {
+      const sec = document.createElement('section'); sec.className = 'group';
+      sec.innerHTML = `<h2>${g.key} <span class="tm" lang="hi">${g.tm}</span></h2>`;
+      const rows = document.createElement('div'); rows.className = 'rows';
+      g.rows.forEach(row => {
+        const grid = document.createElement('div'); grid.className = 'grid' + (g.cols === 5 ? ' c5' : '');
+        row.forEach(() => {
+          const i = n++, l = LETTERS[i];
+          const b = document.createElement('button');
+          b.type = 'button'; b.className = 'tile' + (isDone(i) ? ' done' : '');
+          b.setAttribute('aria-label', `${l.roman}${isDone(i) ? ', traced' : ''}`);
+          b.innerHTML = `<span class="g" lang="hi">${l.ch}</span><span class="r">${l.roman}</span>`;
+          b.addEventListener('click', () => openLetter(i));
+          grid.appendChild(b);
+        });
+        rows.appendChild(grid);
+      });
+      sec.appendChild(rows); groupsEl.appendChild(sec);
+    });
+
+    const strip = $('strip'); strip.innerHTML = ''; strip.style.setProperty('--n', N);
+    for (let i = 0; i < N; i++) { const t = document.createElement('i'); if (isDone(i)) t.className = 'on'; strip.appendChild(t); }
+
+    const d = doneCount();
+    $('count').textContent = `${d} of ${N} traced`;
+    const next = LETTERS.findIndex((_, i) => !isDone(i));
+    const btn = $('continue');
+    if (next === -1) { btn.innerHTML = `Trace again from the start`; btn.onclick = () => openLetter(0); }
+    else {
+      const l = LETTERS[next];
+      btn.innerHTML = `${d ? 'Continue with' : 'Start with'} <span class="tm" lang="hi">${l.ch}</span> ${l.roman}`;
+      btn.onclick = () => openLetter(next);
+    }
+    if (!storageOK) setStatus('Progress can’t be saved in this mode. Install the app, or open it from a web address, to keep it.');
+  }
+
+  function setStatus(t) { $('status').textContent = t; }
+
+  /* ---------------- Install + offline status ---------------- */
+  let deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; $('install').hidden = false; });
+  $('install').addEventListener('click', async () => {
+    if (!deferredInstall) return;
+    deferredInstall.prompt(); await deferredInstall.userChoice.catch(() => {});
+    deferredInstall = null; $('install').hidden = true;
+  });
+  window.addEventListener('appinstalled', () => { $('install').hidden = true; });
+
+  window.__akshar = { PACK, LETTERS, setStatus, get state(){ return { idx, strokes:strokes.length, passed, fingerOn, penDown, storageOK, W, H, S }; } };
+
+  /* ---------------- Boot ---------------- */
+  new ResizeObserver(() => { if (!practice.hidden) layout(); }).observe(stage);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { redrawGuide(); redrawInk(); });
+  const refont = () => { if (!practice.hidden) redrawGuide(); };
+  if (document.fonts) {
+    document.fonts.load('500 100px "Poppins"', 'कअ').then(refont).catch(() => {});
+    document.fonts.addEventListener && document.fonts.addEventListener('loadingdone', refont);
+  }
+  renderHome();
+})();
+(() => {
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+  const A = window.__akshar;
+  navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => {
+    if (A) A.setStatus('Ready for offline use. You can turn off the internet.');
+  }).catch(() => { if (A) A.setStatus('Offline mode could not start here. Open this app from a web address (see the guide).'); });
+})();
+</script>
+</body>
+</html>
