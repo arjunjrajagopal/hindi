@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>दिन लिखिए</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#fff;
+    font-family:'Noto Sans Devanagari','Mukta','Nirmala UI',system-ui,sans-serif;
+    touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+    overscroll-behavior:none}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column}
+  #top{flex:0 0 20%;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) minmax(0,1fr);
+    align-items:center;column-gap:1.5vw;
+    padding:0 max(2.5vw,env(safe-area-inset-right)) 0 max(2.5vw,env(safe-area-inset-left));
+    background:#f1f6fc;border-bottom:2px solid #cfe0f2}
+  #prog{display:flex;flex-direction:column;align-items:flex-start;gap:1.6vh}
+  #mid{display:flex;align-items:center;justify-content:center;min-width:0}
+  #msg{font-size:min(6.4vh,4vw);font-weight:700;color:#1d3557;text-align:center;line-height:1.2}
+  #dots{display:flex;gap:.7vw;align-items:flex-end}
+  #dots i{position:relative;overflow:hidden;width:2.6vw;max-width:26px;height:7vh;border-radius:5px;
+    border:2px solid #9bb6d4;box-sizing:border-box;background:#fff}
+  #dots i b{position:absolute;left:0;right:0;bottom:0;background:#2a9d5c;transition:height .5s ease}
+  #dots i.cur{border-color:#1d3557}
+  .btn{flex:0 0 auto;width:14vh;height:14vh;border-radius:50%;border:0;font-size:7vh;color:#1d3557;padding:0;
+    background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;
+    touch-action:manipulation}
+  .btn:active{transform:scale(.94)}
+  #ok{background:#2a9d5c;color:#fff}
+  #btns{display:flex;gap:1.2vw;justify-content:flex-end}
+  .btn svg{width:62%;height:62%}
+  #stage{flex:1;position:relative;background:#fff}
+  canvas{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
+  #ink{cursor:crosshair}
+  #ver{position:fixed;right:6px;bottom:3px;font:11px sans-serif;color:#bbb;pointer-events:none}
+  .overlay{position:fixed;inset:0;background:#f1f6fc;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:4vh;z-index:10;text-align:center;color:#1d3557}
+  #start button{font:700 min(12vh,8vw) inherit;font-family:inherit;padding:3vh 6vw;border-radius:5vh;border:0;
+    background:#2a9d5c;color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.3)}
+  #start h1{font-size:min(14vh,9vw);margin:0}
+  #rotate{display:none;z-index:20;font-size:6vw}
+  #rotate div{font-size:20vw}
+  @media (orientation:portrait){#rotate{display:flex}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <div id="prog"><div id="dots"></div></div>
+    <div id="mid"><div id="msg"></div></div>
+    <div id="btns">
+      <button class="btn" id="hear" aria-label="सुनिए"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M6 24h12L34 9v46L18 40H6z" fill="currentColor"/><path d="M44 22a14 14 0 0 1 0 20M51 13a25 25 0 0 1 0 38" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/></svg></button>
+      <button class="btn" id="clear" aria-label="मिटाइए">🗑️</button>
+      <button class="btn" id="ok" aria-label="हो गया">✔</button>
+    </div>
+  </div>
+  <div id="stage">
+    <canvas id="base"></canvas>
+    <canvas id="anim" style="pointer-events:none"></canvas>
+    <canvas id="ink"></canvas>
+  </div>
+</div>
+<div id="start" class="overlay">
+  <h1>दिन लिखिए</h1>
+  <button id="go">शुरू करें ▶</button>
+</div>
+<div id="rotate" class="overlay"><div>📱↻</div>फ़ोन को आड़ा कीजिए</div>
+<div id="ver">v5</div>
+
+<script>
+(function(){
+'use strict';
+var DAYS=['सोमवार','मंगलवार','बुधवार','गुरुवार','शुक्रवार','शनिवार','रविवार'];
+var PROMPT='शब्द लिखिए';
+var CAREFUL='अब थोड़ा और ध्यान से लिखिए';
+var AGAIN='फिर से कोशिश कीजिए';
+var PRAISE='शाबाश!';
+var ALLDONE='बहुत अच्छे! सातों दिन पूरे';
+var FONT="'Noto Sans Devanagari','Mukta','Nirmala UI',sans-serif";
+var PASS=0.8, HALF=0.5;
+// attempt 1: target stays; attempt 2: fades slowly; attempt 3: fades faster (ms for the left-to-right fade)
+var FADE_MS=[0,15000,9000];
+var PAUSE_MS=2000;  // after the green button: bell, then this pause
+var HOLD_MS=3000;   // after "try a little faster", before the fade starts
+var FASTER='थोड़ा जल्दी लिखिए';
+var attempt=0;
+
+var $=function(id){return document.getElementById(id);};
+var base=$('base'),anim=$('anim'),ink=$('ink');
+var bctx=base.getContext('2d'),actx=anim.getContext('2d'),ictx=ink.getContext('2d');
+var msgEl=$('msg'),dotsEl=$('dots');
+
+var idx=0;
+try{idx=parseInt(localStorage.getItem('days_dayIdx'),10)||0;}catch(e){}
+if(idx<0||idx>6)idx=0;
+var passes=[0,0,0,0,0,0,0]; // passes per day, 0-3; each pass fills a third of that day's bar
+try{var sp=JSON.parse(localStorage.getItem('days_passes'));
+  if(Array.isArray(sp)&&sp.length===7)passes=sp.map(function(n){return Math.max(0,Math.min(3,n|0));});}catch(e){}
+function savePasses(){try{localStorage.setItem('days_passes',JSON.stringify(passes));}catch(e){}}
+
+var W=0,H=0,dpr=1,fs=100,baseY=0,textL=0,textR=0,PEN=10,R=10,ASC=70,AC=null;
+var strokes=[],cur=null,penSeen=false;
+var inputOn=false,token=0,started=false;
+
+function word(){return DAYS[idx];}
+function msg(t){msgEl.textContent=t;}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+
+function drawDots(){
+  dotsEl.innerHTML='';
+  for(var i=0;i<7;i++){
+    var d=document.createElement('i'),f=document.createElement('b');
+    f.style.height=(passes[i]/3*100)+'%';
+    d.appendChild(f);
+    if(i===idx)d.className='cur';
+    dotsEl.appendChild(d);
+  }
+}
+
+/* ---------- speech ---------- */
+var voice=null;
+function pickVoice(){
+  if(!('speechSynthesis' in window))return;
+  var vs=speechSynthesis.getVoices();
+  for(var i=0;i<vs.length;i++){if(/^hi/i.test(vs[i].lang)){voice=vs[i];break;}}
+}
+if('speechSynthesis' in window){pickVoice();speechSynthesis.onvoiceschanged=pickVoice;}
+function say(text){
+  return new Promise(function(res){
+    if(!('speechSynthesis' in window)){setTimeout(res,1200);return;}
+    try{
+      speechSynthesis.cancel();
+      var u=new SpeechSynthesisUtterance(text);
+      u.lang='hi-IN';u.rate=0.8;if(voice)u.voice=voice;
+      var done=false;function fin(){if(!done){done=true;res();}}
+      u.onend=fin;u.onerror=fin;
+      setTimeout(fin,4500);
+      speechSynthesis.speak(u);
+    }catch(e){setTimeout(res,1200);}
+  });
+}
+
+/* ---------- layout ---------- */
+function sizeCanvas(c){
+  c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);
+}
+function layout(){
+  var r=$('stage').getBoundingClientRect();
+  W=Math.max(50,Math.round(r.width));H=Math.max(50,Math.round(r.height));
+  dpr=Math.min(window.devicePixelRatio||1,3);
+  [base,anim,ink].forEach(sizeCanvas);
+  [bctx,actx,ictx].forEach(function(c){c.setTransform(dpr,0,0,dpr,0,0);});
+  fitWord();
+  PEN=Math.max(8,Math.min(16,fs*0.07));
+  R=fs*0.11;
+  strokes=[];cur=null;
+  drawBase();
+}
+function fitWord(){
+  fs=H*0.66;
+  bctx.font='600 '+fs+'px '+FONT;
+  var w=bctx.measureText(word()).width;
+  if(w>W*0.92)fs=fs*W*0.92/w;
+  bctx.font='600 '+fs+'px '+FONT;
+  w=bctx.measureText(word()).width;
+  ASC=bctx.measureText('क').actualBoundingBoxAscent||fs*0.7;
+  textL=(W-w)/2;textR=textL+w;
+  baseY=H/2+ASC/2; // centres the guideline block (headline-0.28fs ... baseline+0.28fs) vertically
+}
+function guides(ctx){
+  // headline = top of flat bar of letters; measured from a letter
+  ctx.font='600 '+fs+'px '+FONT;
+  var asc=ASC;
+  var top=baseY-asc;
+  var topMatra=top-fs*0.28;
+  var low=baseY+fs*0.28;
+  ctx.save();
+  ctx.strokeStyle='#bcd9f2';ctx.lineWidth=2;
+  [topMatra,top,baseY,low].forEach(function(y,i){
+    ctx.setLineDash(i===1?[]:[10,8]);
+    ctx.globalAlpha=i===1?0.9:0.7;
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+  });
+  ctx.restore();
+}
+function drawWord(ctx,color){
+  ctx.font='600 '+fs+'px '+FONT;
+  ctx.textBaseline='alphabetic';ctx.textAlign='left';
+  ctx.fillStyle=color;
+  ctx.fillText(word(),textL,baseY);
+}
+function drawBase(){
+  bctx.clearRect(0,0,W,H);
+  guides(bctx);
+  if(attempt===0)drawWord(bctx,'#d2d2d2');
+}
+// grey target for attempts 2 and 3: p=0 fully visible, p=1 gone; fades from the left
+function drawFade(p){
+  actx.clearRect(0,0,W,H);
+  if(p>=1)return;
+  var soft=fs*0.4,e=textL-soft+((textR-textL)+soft)*p;
+  actx.save();
+  drawWord(actx,'#d2d2d2');
+  actx.globalCompositeOperation='destination-out';
+  var g=actx.createLinearGradient(e,0,e+soft,0);
+  g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');
+  actx.fillStyle=g;actx.fillRect(0,0,W,H);
+  actx.restore();
+}
+async function fadeOut(t,dur){
+  var t0=performance.now();
+  while(t===token){
+    var p=Math.min(1,(performance.now()-t0)/dur);
+    drawFade(p);
+    if(p>=1)break;
+    await frame();
+  }
+}
+function clearInk(){
+  strokes=[];cur=null;ictx.clearRect(0,0,W,H);
+}
+
+/* ---------- demo animation ---------- */
+function ease(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;}
+function frame(){return new Promise(function(r){requestAnimationFrame(r);});}
+async function playTrace(t){
+  var dur=2800,t0=performance.now(),x0=textL-8,x1=textR+8;
+  while(true){
+    if(t!==token)return false;
+    var p=Math.min(1,(performance.now()-t0)/dur);
+    var x=x0+(x1-x0)*ease(p);
+    actx.clearRect(0,0,W,H);
+    actx.save();actx.beginPath();actx.rect(0,0,x,H);actx.clip();
+    drawWord(actx,'#444');
+    actx.restore();
+    if(p>=1)break;
+    await frame();
+  }
+  await sleep(500);
+  // revert to original grey: fade the dark layer out
+  var f0=performance.now();
+  while(true){
+    if(t!==token)return false;
+    var q=Math.min(1,(performance.now()-f0)/600);
+    actx.clearRect(0,0,W,H);
+    actx.save();actx.globalAlpha=1-q;drawWord(actx,'#444');actx.restore();
+    if(q>=1)break;
+    await frame();
+  }
+  actx.clearRect(0,0,W,H);
+  return true;
+}
+
+/* ---------- main flow ---------- */
+// one attempt at the current word; the demo trace plays only on attempt 1
+async function intro(){
+  var t=++token;
+  inputOn=false;clearInk();actx.clearRect(0,0,W,H);
+  fitWord();drawBase();drawDots();
+  if(attempt>0)drawFade(0);
+  if(attempt===0){
+    // new day: say its name, then "write the word" once, then the demo trace
+    msg(word());await say(word());if(t!==token)return;
+    await sleep(300);
+    msg(PROMPT);await say(PROMPT);if(t!==token)return;
+    await sleep(300);
+    if(!(await playTrace(t)))return;
+    msg(PROMPT);
+    inputOn=true;
+    return;
+  }
+  // attempts 2 and 3: "try a little faster", writing opens, 3 s later the target starts to fade
+  msg(FASTER);await say(FASTER);if(t!==token)return;
+  msg(PROMPT);inputOn=true;
+  await sleep(HOLD_MS);if(t!==token)return;
+  fadeOut(t,FADE_MS[attempt]);
+}
+async function reprompt(text){
+  var t=++token;inputOn=false;
+  msg(text);await say(text);if(t!==token)return;
+  clearInk();msg(PROMPT);inputOn=true;
+}
+
+/* ---------- drawing input ---------- */
+function pos(e){var r=ink.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+ink.addEventListener('pointerdown',function(e){
+  if(!inputOn)return;
+  if(e.pointerType==='pen')penSeen=true;
+  else if(e.pointerType==='touch'&&penSeen)return; // palm rejection
+  e.preventDefault();
+  try{ink.setPointerCapture(e.pointerId);}catch(x){}
+  var p=pos(e);
+  cur={id:e.pointerId,pts:[p]};strokes.push(cur);
+  ictx.fillStyle='#1d3557';ictx.beginPath();ictx.arc(p.x,p.y,PEN/2,0,6.283);ictx.fill();
+});
+ink.addEventListener('pointermove',function(e){
+  if(!cur||e.pointerId!==cur.id)return;
+  e.preventDefault();
+  var evs=(e.getCoalescedEvents&&e.getCoalescedEvents())||[e];
+  if(!evs.length)evs=[e];
+  ictx.strokeStyle='#1d3557';ictx.lineWidth=PEN;ictx.lineCap='round';ictx.lineJoin='round';
+  for(var i=0;i<evs.length;i++){
+    var p=pos(evs[i]),q=cur.pts[cur.pts.length-1];
+    ictx.beginPath();ictx.moveTo(q.x,q.y);ictx.lineTo(p.x,p.y);ictx.stroke();
+    cur.pts.push(p);
+  }
+});
+function up(e){if(cur&&e.pointerId===cur.id)cur=null;}
+ink.addEventListener('pointerup',up);
+ink.addEventListener('pointercancel',up);
+
+/* ---------- scoring ---------- */
+function mk(w,h){var c=document.createElement('canvas');c.width=w;c.height=h;return c;}
+function drawStrokes(ctx,width,s){
+  ctx.strokeStyle='#000';ctx.fillStyle='#000';ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=width*s;
+  strokes.forEach(function(st){
+    var p=st.pts;
+    ctx.beginPath();ctx.arc(p[0].x*s,p[0].y*s,width*s/2,0,6.283);ctx.fill();
+    ctx.beginPath();ctx.moveTo(p[0].x*s,p[0].y*s);
+    for(var i=1;i<p.length;i++)ctx.lineTo(p[i].x*s,p[i].y*s);
+    ctx.stroke();
+  });
+}
+function score(){
+  var s=0.5,w=Math.round(W*s),h=Math.round(H*s);
+  var cM=mk(w,h),cW=mk(w,h),cI=mk(w,h),cD=mk(w,h);
+  var m=cM.getContext('2d'),wd=cW.getContext('2d'),it=cI.getContext('2d'),dl=cD.getContext('2d');
+  [m,wd].forEach(function(c){c.font='600 '+(fs*s)+'px '+FONT;c.textBaseline='alphabetic';c.fillStyle='#000';c.strokeStyle='#000';});
+  m.fillText(word(),textL*s,baseY*s);
+  wd.fillText(word(),textL*s,baseY*s);
+  wd.lineWidth=2*R*s;wd.lineJoin='round';wd.strokeText(word(),textL*s,baseY*s);
+  drawStrokes(it,PEN,s);
+  drawStrokes(dl,PEN+2*R*0.9,s);
+  var aM=m.getImageData(0,0,w,h).data,aW=wd.getImageData(0,0,w,h).data,
+      aI=it.getImageData(0,0,w,h).data,aD=dl.getImageData(0,0,w,h).data;
+  var mTot=0,mHit=0,iTot=0,iHit=0;
+  for(var i=3;i<aM.length;i+=4){
+    if(aM[i]>100){mTot++;if(aD[i]>100)mHit++;}
+    if(aI[i]>100){iTot++;if(aW[i]>100)iHit++;}
+  }
+  if(!iTot||!mTot)return {score:0,cover:0,prec:0,empty:true};
+  var cover=mHit/mTot,prec=iHit/iTot;
+  return {score:(cover+prec)/2,cover:cover,prec:prec,empty:false};
+}
+window.__score=score; // for testing
+
+function bell(){
+  if(!AC)return;
+  try{
+    if(AC.state==='suspended')AC.resume();
+    var now=AC.currentTime,master=AC.createGain();
+    master.gain.value=0.4;master.connect(AC.destination);
+    [[880,1,1.8],[880*2.76,0.5,1.1],[880*5.4,0.25,0.7],[880*8.93,0.12,0.4]].forEach(function(p){
+      var o=AC.createOscillator(),g=AC.createGain();
+      o.type='sine';o.frequency.value=p[0];
+      g.gain.setValueAtTime(0.0001,now);
+      g.gain.linearRampToValueAtTime(p[1],now+0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001,now+p[2]);
+      o.connect(g);g.connect(master);o.start(now);o.stop(now+p[2]+0.05);
+    });
+  }catch(e){}
+}
+async function check(){
+  if(!inputOn)return;
+  var r=score();
+  if(r.empty)return; // nothing written yet: keep waiting (and keep fading)
+  inputOn=false;
+  var t=++token;
+  var m=r.score>=PASS?PRAISE:(r.score>=HALF?CAREFUL:AGAIN);
+  var lastAttempt=(attempt===2),lastDay=(idx===6);
+  if(r.score>=PASS){passes[idx]=Math.min(3,passes[idx]+1);savePasses();drawDots();}
+  if(lastAttempt&&lastDay&&passes.every(function(n){return n===3;}))m=ALLDONE;
+  bell();
+  msg((r.score>=PASS?'⭐ ':'')+m);
+  await sleep(PAUSE_MS);if(t!==token)return;
+  if(lastAttempt){
+    await say(m);if(t!==token)return;
+    await sleep(500);if(t!==token)return;
+    attempt=0;
+    idx=lastDay?0:idx+1;
+    try{localStorage.setItem('days_dayIdx',idx);}catch(e){}
+  }else{
+    attempt++;
+  }
+  intro();
+}
+
+/* ---------- buttons ---------- */
+$('ok').addEventListener('click',check);
+$('clear').addEventListener('click',function(){if(inputOn)clearInk();});
+$('hear').addEventListener('click',function(){say(word());});
+
+$('go').addEventListener('click',function(){
+  $('start').style.display='none';
+  try{var el=document.documentElement;(el.requestFullscreen||el.webkitRequestFullscreen).call(el);}catch(e){}
+  try{screen.orientation.lock('landscape').catch(function(){});}catch(e){}
+  // unlock audio (bell) on user gesture
+  try{AC=new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(e){AC=null;}
+  // unlock speech on user gesture
+  try{if('speechSynthesis' in window){var u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}}catch(e){}
+  started=true;
+  setTimeout(async function(){
+    try{await Promise.race([document.fonts.load('600 40px "Noto Sans Devanagari"','सोमवार'),sleep(1500)]);}catch(e){}
+    layout();intro();
+  },250);
+});
+
+var rt;
+window.addEventListener('resize',function(){
+  clearTimeout(rt);
+  rt=setTimeout(function(){if(started){layout();if(inputOn){drawDots();}}},200);
+});
+
+drawDots();
+})();
+</script>
+</body>
+</html>
