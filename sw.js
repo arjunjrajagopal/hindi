@@ -1,6 +1,6 @@
 /* Akshar service worker: caches the whole app on first visit so it runs with no internet.
    When you change any app file, bump CACHE (e.g. akshar-v2) so phones pick up the new copy. */
-const CACHE = 'akshar-v3';
+const CACHE = 'akshar-v4';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './fonts/poppins-regular.woff', './fonts/poppins-medium.woff', './fonts/poppins-bold.woff', './fonts/translit.woff',
@@ -25,8 +25,8 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
-  // The weekday writing app lives in /days/ and is not part of Akshar: let the network handle it.
-  if (/\/days(\/|$)/.test(url.pathname)) return;
+  // The weekday and month writing apps live in /days/ and /months/ and are not part of Akshar: let the network handle them.
+  if (/\/(days|months)(\/|$)/.test(url.pathname)) return;
   e.respondWith(
     caches.open(CACHE).then(async cache => {
       const hit = await cache.match(req, { ignoreSearch: true });
