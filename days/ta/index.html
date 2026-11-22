@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>கிழமை எழுதலாம் வாங்க</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="கிழமை">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
 <style>
   /* Noto Sans Tamil SemiBold, SIL Open Font License 1.1 (Google Noto). Bundled font: the stroke paths below were traced from exactly this font, so it must not be swapped. */
   @font-face{font-family:'NSTa';src:url('noto-sans-tamil-600.woff2') format('woff2');font-weight:600;font-display:block}
@@ -70,7 +76,7 @@
   <button id="go">ஆரம்பிங்க ▶</button>
 </div>
 <div id="rotate" class="overlay"><div>📱↻</div>ஃபோனைச் சாய்ச்சுப் பிடிங்க</div>
-<div id="ver">ta v3</div>
+<div id="ver">ta v4</div>
 
 <script>
 (function(){
@@ -631,7 +637,11 @@ $('hear').addEventListener('click',function(){say(word());});
 
 $('go').addEventListener('click',function(){
   $('start').style.display='none';
-  try{var el=document.documentElement;(el.requestFullscreen||el.webkitRequestFullscreen).call(el);}catch(e){}
+  // iPad/iPhone Safari drops element fullscreen on the first pen or finger tap, which resized the page mid-word.
+  // There, skip it: open the app from the Home Screen instead (Share > Add to Home Screen) for true full screen.
+  var iOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  var standalone=navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone),(display-mode: fullscreen)').matches);
+  if(!iOS&&!standalone){try{var el=document.documentElement;(el.requestFullscreen||el.webkitRequestFullscreen).call(el);}catch(e){}}
   try{screen.orientation.lock('landscape').catch(function(){});}catch(e){}
   try{AC=new (window.AudioContext||window.webkitAudioContext)();AC.resume();}catch(e){AC=null;}
   try{if('speechSynthesis' in window){var u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}}catch(e){}
@@ -647,7 +657,19 @@ window.addEventListener('resize',function(){
   clearTimeout(rt);
   rt=setTimeout(function(){
     if(!started)return;
-    // a resize moves the letters, so the half-written word can't be checked any more: restart this attempt
+    // While writing: rescale the ink and the guide to the new size and carry on with the same attempt.
+    // At any other moment (demo playing, checking), restart the attempt as before.
+    if(inputOn&&!cur){
+      var o={l:textL,b:baseY,f:fs},keep=strokes,pr=prog;
+      layout();
+      strokes=keep.map(function(st){return {id:st.id,pts:st.pts.map(function(p){
+        return {x:textL+(p.x-o.l)/o.f*fs,y:baseY+(p.y-o.b)/o.f*fs};})};});
+      if(pr&&pr.cov.length===units.length&&pr.cov.every(function(c,i){return c.length===units[i].pts.length;}))prog=pr;
+      else{prog=pr;resetProgress();prog.mistakes=pr?pr.mistakes:0;}
+      redrawInk();
+      if(attempt>0){var fp=fading?Math.min(1,(performance.now()-fading.t0)/fading.dur):0;drawFade(fp);}
+      return;
+    }
     layout();intro();
   },200);
 });

@@ -1,0 +1,15 @@
+{
+  "name": "கிழமை – write the Tamil days of the week",
+  "short_name": "கிழமை",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#f1f6fc",
+  "theme_color": "#1d3557",
+  "lang": "ta",
+  "icons": [
+    { "src": "../../icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../../icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
