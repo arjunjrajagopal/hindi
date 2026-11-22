@@ -19,11 +19,14 @@
   #prog{display:flex;flex-direction:column;align-items:flex-start;gap:1.6vh}
   #mid{display:flex;align-items:center;justify-content:center;min-width:0}
   #msg{font-size:min(5.6vh,3.4vw);font-weight:600;color:#1d3557;text-align:center;line-height:1.25}
-  #dots{display:flex;gap:.7vw;align-items:flex-end}
-  #dots i{position:relative;overflow:hidden;width:2.6vw;max-width:26px;height:7vh;border-radius:5px;
-    border:2px solid #9bb6d4;box-sizing:border-box;background:#fff}
-  #dots i b{position:absolute;left:0;right:0;bottom:0;background:#2a9d5c;transition:height .5s ease}
-  #dots i.cur{border-color:#1d3557}
+  #dots{display:flex;gap:.5vw;align-items:flex-end}
+  #dots button{position:relative;overflow:hidden;width:min(5vw,52px);min-width:40px;height:max(9vh,44px);border-radius:8px;
+    border:2px solid #9bb6d4;box-sizing:border-box;background:#fff;padding:0;font:600 min(3.4vh,2.2vw)/1 inherit;
+    color:#1d3557;touch-action:manipulation;cursor:pointer}
+  #dots button b{position:absolute;left:0;right:0;bottom:0;background:#a8dcbc;transition:height .5s ease}
+  #dots button span{position:relative}
+  #dots button.cur{border-color:#1d3557;border-width:3px;background:#e4eefa}
+  #dots button:active{transform:scale(.94)}
   .btn{flex:0 0 auto;width:14vh;height:14vh;border-radius:50%;border:0;font-size:7vh;color:#1d3557;padding:0;
     background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;
     touch-action:manipulation}
@@ -67,7 +70,7 @@
   <button id="go">ஆரம்பிங்க ▶</button>
 </div>
 <div id="rotate" class="overlay"><div>📱↻</div>ஃபோனைச் சாய்ச்சுப் பிடிங்க</div>
-<div id="ver">ta v2</div>
+<div id="ver">ta v3</div>
 
 <script>
 (function(){
@@ -75,17 +78,14 @@
 // Short calendar names, standard written spelling (the same in formal and spoken Tamil).
 var DAYS=['திங்கள்','செவ்வாய்','புதன்','வியாழன்','வெள்ளி','சனி','ஞாயிறு'];
 // Prompts in spoken polite Tamil (-ங்க), the way people talk, not textbook Tamil.
-var PROMPT='இந்த வார்த்தைய எழுதுங்க';
-var CAREFUL='இன்னும் கொஞ்சம் கவனமா எழுதுங்க';
-var AGAIN='மறுபடியும் முயற்சி பண்ணுங்க';
-var PRAISE='சபாஷ்!';
-var ALLDONE='ரொம்ப நல்லா இருக்கு! ஏழு நாளும் முடிஞ்சுது';
-var FASTER='கொஞ்சம் வேகமா எழுதுங்க';
-var ORDER='வரிசைப்படி எழுதுங்க';            // wrong letter / sign / dot order
-var DIRECTION='சரியான பக்கமா எழுதுங்க';      // stroke drawn the wrong way (strict letters only)
-var STRAY='எழுத்து மேலயே எழுதுங்க';          // ink well away from the letters
-var WATCH='இப்படி எழுதுங்க';                 // before the correction demo
-var NODOT='புள்ளி வைக்க மறந்துட்டீங்க';       // letters fine, a pulli dot is missing
+// Power-user mode: no spoken prompts or praise. The only speech is the target word, read out clearly.
+// Feedback is shown silently as short labels.
+var CAREFUL='✗ shape: try again';
+var AGAIN='✗ try again';
+var ORDER='✗ stroke order';            // wrong letter / sign / dot order
+var DIRECTION='✗ stroke direction';    // stroke drawn the wrong way (strict letters only)
+var STRAY='✗ off the letter';          // ink well away from the letters
+var NODOT='✗ pulli dot missing';       // letters fine, a pulli dot is missing
 var FONT="'NSTa','Tamil Sangam MN','Latha','Nirmala UI',sans-serif";
 var PASS=0.8, HALF=0.5;
 var FADE_MS=[0,15000,9000];
@@ -124,16 +124,30 @@ function word(){return DAYS[idx];}
 function msg(t){msgEl.textContent=t;}
 function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
 
+// Day tiles: progress fill (0-3 passes) under the day's first letter. Tap a day to jump straight to it;
+// tap the current day to start it over with the grey guide and demo.
+var TILE=['தி','செ','பு','வி','வெ','ச','ஞா'];
 function drawDots(){
   dotsEl.innerHTML='';
   for(var i=0;i<7;i++){
-    var d=document.createElement('i'),f=document.createElement('b');
-    f.style.height=(passes[i]/3*100)+'%';
-    d.appendChild(f);
+    var d=document.createElement('button'),f=document.createElement('b'),s=document.createElement('span');
+    f.style.height=(passes[i]/3*100)+'%';s.textContent=TILE[i];
+    d.appendChild(f);d.appendChild(s);d.dataset.i=i;d.setAttribute('aria-label',DAYS[i]);
     if(i===idx)d.className='cur';
     dotsEl.appendChild(d);
   }
 }
+function goDay(i){
+  if(!started)return;
+  token++;inputOn=false;fading=null;
+  try{if('speechSynthesis' in window)speechSynthesis.cancel();}catch(e){}
+  idx=i;attempt=0;
+  try{localStorage.setItem('days_ta_dayIdx',idx);}catch(e){}
+  intro();
+}
+dotsEl.addEventListener('click',function(e){
+  var b=e.target.closest('button');if(b)goDay(+b.dataset.i);
+});
 
 /* ---------- speech ---------- */
 var voice=null;
@@ -149,7 +163,7 @@ function say(text){
     try{
       speechSynthesis.cancel();
       var u=new SpeechSynthesisUtterance(text);
-      u.lang='ta-IN';u.rate=0.8;if(voice)u.voice=voice;
+      u.lang='ta-IN';u.rate=0.65;if(voice)u.voice=voice;
       var done=false;function fin(){if(!done){done=true;res();}}
       u.onend=fin;u.onerror=fin;
       setTimeout(fin,4500);
@@ -444,18 +458,16 @@ async function intro(){
   inputOn=false;fading=null;clearInk();actx.clearRect(0,0,W,H);
   fitWord();buildModel();drawBase();drawDots();
   if(attempt>0)drawFade(0);
+  msg(word());
   if(attempt===0){
-    msg(word());await say(word());if(t!==token)return;
-    await sleep(300);
-    msg(PROMPT);await say(PROMPT);if(t!==token)return;
+    await say(word());if(t!==token)return;
     await sleep(300);
     if(!(await playStrokes(t,units)))return;
-    msg(PROMPT);
     inputOn=true;
     return;
   }
-  msg(FASTER);await say(FASTER);if(t!==token)return;
-  msg(PROMPT);inputOn=true;
+  inputOn=true;
+  await say(word());if(t!==token)return;
   await sleep(HOLD_MS);if(t!==token)return;
   fadeOut(t,FADE_MS[attempt]);
 }
@@ -465,8 +477,8 @@ async function correct(st,kind){
   var keepFade=fading;
   paintStroke(st,'#d62828');
   var text=kind==='order'?ORDER:kind==='dir'?DIRECTION:STRAY;
-  msg('✗ '+text);
-  await say(text);if(t!==token)return;
+  msg(text);
+  await sleep(900);if(t!==token)return;
   strokes.pop();redrawInk();
   advance();
   // show the right way: the letter that is due, or (if all letters are written) the first missing dot
@@ -474,10 +486,9 @@ async function correct(st,kind){
   if(prog.cur<units.length)show=[{segs:units[prog.cur].segs,dot:null}];
   else for(var i=0;i<units.length;i++)if(!prog.dotDone[i]){show=[{segs:[],dot:units[i].dot}];break;}
   if(show){
-    msg(WATCH);await say(WATCH);if(t!==token)return;
     if(!(await playStrokes(t,show)))return;
   }
-  msg(PROMPT);inputOn=true;
+  msg(word());inputOn=true;
   if(keepFade){
     // carry on fading from where it was
     var p0=Math.min(1,(performance.now()-keepFade.t0)/keepFade.dur);
@@ -590,17 +601,13 @@ async function check(){
   // a pass needs the right shape AND every letter, sign and dot written, in order, with no corrections
   var ok=r.score>=PASS&&allDone()&&prog.mistakes===0;
   var bodies=units.every(function(u,i){return bodyDone(i);});
-  var m=ok?PRAISE:(r.score>=PASS&&prog.mistakes>0?ORDER:
+  var m=ok?'✓ '+word():(r.score>=PASS&&prog.mistakes>0?ORDER:
         (r.score>=PASS&&bodies&&!allDone()?NODOT:(r.score>=HALF?CAREFUL:AGAIN)));
   var lastAttempt=(attempt===2),lastDay=(idx===6);
-  if(ok){passes[idx]=Math.min(3,passes[idx]+1);savePasses();drawDots();}
-  if(lastAttempt&&lastDay&&passes.every(function(n){return n===3;}))m=ALLDONE;
-  bell();
-  msg((ok?'⭐ ':'')+m);
+  if(ok){passes[idx]=Math.min(3,passes[idx]+1);savePasses();drawDots();bell();}
+  msg(m);
   await sleep(PAUSE_MS);if(t!==token)return;
   if(lastAttempt){
-    await say(m);if(t!==token)return;
-    await sleep(500);if(t!==token)return;
     attempt=0;
     idx=lastDay?0:idx+1;
     try{localStorage.setItem('days_ta_dayIdx',idx);}catch(e){}
@@ -612,7 +619,14 @@ async function check(){
 
 /* ---------- buttons ---------- */
 $('ok').addEventListener('click',check);
-$('clear').addEventListener('click',function(){if(inputOn)clearInk();});
+$('clear').addEventListener('click',function(){
+  if(!inputOn)return;
+  clearInk();msg(word());
+  if(attempt>0){
+    var t=++token;fading=null;drawFade(0);
+    (async function(){await sleep(HOLD_MS);if(t!==token)return;fadeOut(t,FADE_MS[attempt]);})();
+  }
+});
 $('hear').addEventListener('click',function(){say(word());});
 
 $('go').addEventListener('click',function(){
